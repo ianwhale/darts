@@ -8,15 +8,25 @@ from utils import drop_path
 class Cell(nn.Module):
 
   def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev):
+    """
+    Cell constructor.
+    :param genotype: Genotype | namedtuple, see genotypes.py.
+    :param C_prev_prev: int, number of channels in second most previous connection.
+    :param C_prev: int, number of channels in previous connection.
+    :param C: int, current number of channels.
+    :param reduction: bool, is the current cell a reduction cell?
+    :param reduction_prev: bool, was the previous cell a reduction cell?
+    """
     super(Cell, self).__init__()
-    print(C_prev_prev, C_prev, C)
 
+    # If the previous cell was a reduction cell, we must change the channel size.
     if reduction_prev:
       self.preprocess0 = FactorizedReduce(C_prev_prev, C)
     else:
       self.preprocess0 = ReLUConvBN(C_prev_prev, C, 1, 1, 0)
     self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0)
-    
+
+    # If this cell is a reduction, get the valid reduction operations from the genotype.
     if reduction:
       op_names, indices = zip(*genotype.reduce)
       concat = genotype.reduce_concat
@@ -26,6 +36,15 @@ class Cell(nn.Module):
     self._compile(C, op_names, indices, concat, reduction)
 
   def _compile(self, C, op_names, indices, concat, reduction):
+    """
+    Compile the cell's module list.
+    :param C: number of channels.
+    :param op_names: list, list of strings, correspond to keys in the OPS dictionary.
+    :param indices: list, list of ints, ... ?
+    :param concat: list, list of ints, which states to take output from.
+    :param reduction: bool, is this a reduction cell?
+    :return:
+    """
     assert len(op_names) == len(indices)
     self._steps = len(op_names) // 2
     self._concat = concat
@@ -111,23 +130,35 @@ class AuxiliaryHeadImageNet(nn.Module):
 class NetworkCIFAR(nn.Module):
 
   def __init__(self, C, num_classes, layers, auxiliary, genotype):
+    """
+    NetworkCIFAR constructor.
+    :param C: int, number of input channels.
+    :param num_classes: int, number of classes in problem.
+    :param layers: int, total number of layers in the network.
+    :param auxiliary: bool, use auxiliary tower for intermediate results.
+    :param genotype: Genotype | namedtuple, see genotype.py
+    """
     super(NetworkCIFAR, self).__init__()
     self._layers = layers
     self._auxiliary = auxiliary
 
+    # Stem is the first layer in the network.
+    # Increase channels to specified initial size (C)
     stem_multiplier = 3
     C_curr = stem_multiplier*C
     self.stem = nn.Sequential(
       nn.Conv2d(3, C_curr, 3, padding=1, bias=False),
       nn.BatchNorm2d(C_curr)
     )
-    
+
+    # Set up the initial channel sizes.
     C_prev_prev, C_prev, C_curr = C_curr, C_curr, C
     self.cells = nn.ModuleList()
     reduction_prev = False
     for i in range(layers):
+      # 6th and 12th indexes are reduction cells.
       if i in [layers//3, 2*layers//3]:
-        C_curr *= 2
+        C_curr *= 2  # We reduce resolution by 1/2, so double the channel size.
         reduction = True
       else:
         reduction = False
@@ -136,8 +167,10 @@ class NetworkCIFAR(nn.Module):
       self.cells += [cell]
       C_prev_prev, C_prev = C_prev, cell.multiplier*C_curr
       if i == 2*layers//3:
-        C_to_auxiliary = C_prev
+        C_to_auxiliary = C_prev  # Number of channels sent to the auxiliary output.
 
+    # Default is false for auxiliary.
+    # Acts as an intermediate solution that loss can be calculated at.
     if auxiliary:
       self.auxiliary_head = AuxiliaryHeadCIFAR(C_to_auxiliary, num_classes)
     self.global_pooling = nn.AdaptiveAvgPool2d(1)
@@ -145,10 +178,16 @@ class NetworkCIFAR(nn.Module):
 
   def forward(self, input):
     logits_aux = None
+    # Set up initial states.
+    # s0 is the state from 2 cells ago.
+    # s1 is the state from the previous cell.
     s0 = s1 = self.stem(input)
     for i, cell in enumerate(self.cells):
+      # Store the new and old state.
       s0, s1 = s1, cell(s0, s1, self.drop_path_prob)
       if i == 2*self._layers//3:
+        # Again, default for auxiliary is false.
+        # If true, get auxiliary logits to act as a intermediate solution before the last cells.
         if self._auxiliary and self.training:
           logits_aux = self.auxiliary_head(s1)
     out = self.global_pooling(s1)

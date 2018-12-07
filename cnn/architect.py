@@ -9,8 +9,15 @@ def _concat(xs):
 
 
 class Architect(object):
-
+  """
+  Architect updates the architecture parameters of the model.
+  """
   def __init__(self, model, args):
+    """
+    Constructor.
+    :param model: Network, holds the architecture parameters and the neural network weights.
+    :param args: args.namespace, arguments from command line.
+    """
     self.network_momentum = args.momentum
     self.network_weight_decay = args.weight_decay
     self.model = model

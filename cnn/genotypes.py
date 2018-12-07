@@ -2,19 +2,44 @@ from collections import namedtuple
 
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
+#
+# Primitives are used for possible operations to select in normal and reduction cells.
+#
+
+# Primitives for robustness study.
 PRIMITIVES = [
     'none',
     'max_pool_3x3',
     'avg_pool_3x3',
     'skip_connect',
     'sep_conv_3x3',
-    'sep_conv_5x5',
-    'dil_conv_3x3',
-    'dil_conv_5x5'
+    'conv_1x3_3x1',
+    'lbc_3x3',
+    'pert_3x3'
 ]
 
+
+
+# Original DARTS primitives.
+# PRIMITIVES = [
+#     'none',
+#     'max_pool_3x3',
+#     'avg_pool_3x3',
+#     'skip_connect',
+#     'sep_conv_3x3',
+#     'sep_conv_5x5',
+#     'dil_conv_3x3',
+#     'dil_conv_5x5'
+# ]
+
+
+#
+# These genotypes describe the best ones found during the search process for each respective method.
+# The settings below this point don't effect the search in any way, they're just here for constructing fixed networks.
+#
+
 NASNet = Genotype(
-  normal = [
+  normal=[
     ('sep_conv_5x5', 1),
     ('sep_conv_3x3', 0),
     ('sep_conv_5x5', 0),
@@ -27,7 +52,7 @@ NASNet = Genotype(
     ('skip_connect', 1),
   ],
   normal_concat = [2, 3, 4, 5, 6],
-  reduce = [
+  reduce=[
     ('sep_conv_5x5', 1),
     ('sep_conv_7x7', 0),
     ('max_pool_3x3', 1),
@@ -39,11 +64,11 @@ NASNet = Genotype(
     ('sep_conv_3x3', 2),
     ('max_pool_3x3', 1),
   ],
-  reduce_concat = [4, 5, 6],
+  reduce_concat=[4, 5, 6],
 )
     
 AmoebaNet = Genotype(
-  normal = [
+  normal=[
     ('avg_pool_3x3', 0),
     ('max_pool_3x3', 1),
     ('sep_conv_3x3', 0),
@@ -55,8 +80,8 @@ AmoebaNet = Genotype(
     ('skip_connect', 0),
     ('avg_pool_3x3', 1),
     ],
-  normal_concat = [4, 5, 6],
-  reduce = [
+  normal_concat=[4, 5, 6],
+  reduce=[
     ('avg_pool_3x3', 0),
     ('sep_conv_3x3', 1),
     ('max_pool_3x3', 0),
@@ -68,11 +93,50 @@ AmoebaNet = Genotype(
     ('conv_7x1_1x7', 0),
     ('sep_conv_3x3', 5),
   ],
-  reduce_concat = [3, 4, 6]
+  reduce_concat=[3, 4, 6]
 )
 
-DARTS_V1 = Genotype(normal=[('sep_conv_3x3', 1), ('sep_conv_3x3', 0), ('skip_connect', 0), ('sep_conv_3x3', 1), ('skip_connect', 0), ('sep_conv_3x3', 1), ('sep_conv_3x3', 0), ('skip_connect', 2)], normal_concat=[2, 3, 4, 5], reduce=[('max_pool_3x3', 0), ('max_pool_3x3', 1), ('skip_connect', 2), ('max_pool_3x3', 0), ('max_pool_3x3', 0), ('skip_connect', 2), ('skip_connect', 2), ('avg_pool_3x3', 0)], reduce_concat=[2, 3, 4, 5])
-DARTS_V2 = Genotype(normal=[('sep_conv_3x3', 0), ('sep_conv_3x3', 1), ('sep_conv_3x3', 0), ('sep_conv_3x3', 1), ('sep_conv_3x3', 1), ('skip_connect', 0), ('skip_connect', 0), ('dil_conv_3x3', 2)], normal_concat=[2, 3, 4, 5], reduce=[('max_pool_3x3', 0), ('max_pool_3x3', 1), ('skip_connect', 2), ('max_pool_3x3', 1), ('max_pool_3x3', 0), ('skip_connect', 2), ('skip_connect', 2), ('max_pool_3x3', 1)], reduce_concat=[2, 3, 4, 5])
+DARTS_V1 = Genotype(
+  normal=[
+    ('sep_conv_3x3', 1),
+    ('sep_conv_3x3', 0),
+    ('skip_connect', 0),
+    ('sep_conv_3x3', 1),
+    ('skip_connect', 0),
+    ('sep_conv_3x3', 1),
+    ('sep_conv_3x3', 0),
+    ('skip_connect', 2)],
+  normal_concat=[2, 3, 4, 5],
+  reduce=[('max_pool_3x3', 0),
+          ('max_pool_3x3', 1),
+          ('skip_connect', 2),
+          ('max_pool_3x3', 0),
+          ('max_pool_3x3', 0),
+          ('skip_connect', 2),
+          ('skip_connect', 2),
+          ('avg_pool_3x3', 0)],
+  reduce_concat=[2, 3, 4, 5]
+)
+
+DARTS_V2 = Genotype(
+  normal=[('sep_conv_3x3', 0),
+          ('sep_conv_3x3', 1),
+          ('sep_conv_3x3', 0),
+          ('sep_conv_3x3', 1),
+          ('sep_conv_3x3', 1),
+          ('skip_connect', 0),
+          ('skip_connect', 0),
+          ('dil_conv_3x3', 2)],
+  normal_concat=[2, 3, 4, 5],
+  reduce=[('max_pool_3x3', 0),
+          ('max_pool_3x3', 1),
+          ('skip_connect', 2),
+          ('max_pool_3x3', 1),
+          ('max_pool_3x3', 0),
+          ('skip_connect', 2),
+          ('skip_connect', 2),
+          ('max_pool_3x3', 1)],
+  reduce_concat=[2, 3, 4, 5]
+)
 
 DARTS = DARTS_V2
-

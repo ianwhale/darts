@@ -62,6 +62,7 @@ def main():
     logging.info('no gpu device available')
     sys.exit(1)
 
+  # Set random seeds and log GPU info.
   np.random.seed(args.seed)
   torch.cuda.set_device(args.gpu)
   cudnn.benchmark = True
@@ -71,8 +72,11 @@ def main():
   logging.info('gpu device = %d' % args.gpu)
   logging.info("args = %s", args)
 
+  # Set of network and loss function.
   criterion = nn.CrossEntropyLoss()
   criterion = criterion.cuda()
+  # DARTS uses the Network class to store the alphas for optimizing the architecture as well as the ]
+  # weights of the architecture determined through the first level of optimization.
   model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
   model = model.cuda()
   logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
@@ -83,40 +87,47 @@ def main():
       momentum=args.momentum,
       weight_decay=args.weight_decay)
 
+  # Load and transform CIFAR10.
   train_transform, valid_transform = utils._data_transforms_cifar10(args)
   train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
 
+  # Split CIFAR10 training data into training and validation for search.
   num_train = len(train_data)
   indices = list(range(num_train))
   split = int(np.floor(args.train_portion * num_train))
 
+  # Set up torch data loader on 2 CPUs for training data.
   train_queue = torch.utils.data.DataLoader(
       train_data, batch_size=args.batch_size,
       sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
       pin_memory=True, num_workers=2)
 
+  # Set up torch data loader on 2 CPUs for validation data.
   valid_queue = torch.utils.data.DataLoader(
       train_data, batch_size=args.batch_size,
       sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
       pin_memory=True, num_workers=2)
 
+  # Cosine annealing learning rate.
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, float(args.epochs), eta_min=args.learning_rate_min)
 
   architect = Architect(model, args)
 
+  # Start bi-level optimization.
   for epoch in range(args.epochs):
     scheduler.step()
     lr = scheduler.get_lr()[0]
     logging.info('epoch %d lr %e', epoch, lr)
 
+    # Sample a genotype from the metamodel.
     genotype = model.genotype()
     logging.info('genotype = %s', genotype)
 
     print(F.softmax(model.alphas_normal, dim=-1))
     print(F.softmax(model.alphas_reduce, dim=-1))
 
-    # training
+    # Train the deep network that corresponds to the genotype that was sampled.
     train_acc, train_obj = train(train_queue, valid_queue, model, architect, criterion, optimizer, lr)
     logging.info('train_acc %f', train_acc)
 
